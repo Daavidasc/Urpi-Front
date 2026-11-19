@@ -87,7 +87,7 @@ function SidebarContent({ collapsed, onToggleCollapse }: SidebarProps) {
                       item.isAi
                         ? isActive
                           ? "bg-gradient-primary shadow-lg shadow-[#46557a]/25"
-                          : "bg-gradient-primary/90 opacity-90 hover:opacity-100"
+                          : "bg-gradient-primary opacity-90 hover:opacity-100"
                         : isActive
                         ? "bg-sidebar-accent text-primary"
                         : "text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
@@ -106,7 +106,7 @@ function SidebarContent({ collapsed, onToggleCollapse }: SidebarProps) {
                   item.isAi
                     ? isActive
                       ? "bg-gradient-primary text-white shadow-lg shadow-[#46557a]/25"
-                      : "bg-gradient-primary/90 text-white opacity-90 hover:opacity-100"
+                      : "bg-gradient-primary text-white opacity-90 hover:opacity-100"
                     : isActive
                     ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                     : "text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"

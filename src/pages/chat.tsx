@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import {
-  useGetChatHistory,
   useSendChatMessage,
-  getGetChatHistoryQueryKey,
   getGetDashboardStatsQueryKey,
   getListProductsQueryKey,
 } from "@/lib/api-client";
@@ -10,8 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Send, Bot, User, Zap, Package, BarChart2, RefreshCw } from "lucide-react";
+import { Send, Bot, User, Zap, Package, BarChart2, RefreshCw, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const SUGGESTIONS = [
@@ -21,14 +18,59 @@ const SUGGESTIONS = [
   "Registra la entrada de 20 unidades de arroz",
 ];
 
+const STORAGE_KEY = "urpi-chat-history";
+
+type LocalChatEntry = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+};
+
+function loadHistory(): LocalChatEntry[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(entries: LocalChatEntry[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  } catch {
+    // localStorage no disponible (modo privado, cuota llena): se ignora
+  }
+}
+
+function newEntry(role: LocalChatEntry["role"], content: string): LocalChatEntry {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    role,
+    content,
+    createdAt: new Date().toISOString(),
+  };
+}
+
 export function Chat() {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: history, isLoading: historyLoading } = useGetChatHistory();
+  // Historial local por navegador: no se comparte entre usuarios
+  const [history, setHistory] = useState<LocalChatEntry[]>(loadHistory);
   const sendMessage = useSendChatMessage();
+
+  useEffect(() => {
+    saveHistory(history);
+  }, [history]);
+
+  function clearHistory() {
+    setHistory([]);
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -38,9 +80,10 @@ export function Chat() {
     const text = message ?? input.trim();
     if (!text) return;
     setInput("");
+    setHistory(prev => [...prev, newEntry("user", text)]);
     sendMessage.mutate({ data: { message: text } }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetChatHistoryQueryKey() });
+      onSuccess: (res) => {
+        setHistory(prev => [...prev, newEntry("assistant", res.response)]);
         queryClient.invalidateQueries({ queryKey: getGetDashboardStatsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
       },
@@ -79,13 +122,7 @@ export function Chat() {
 
       <Card className="flex-1 flex flex-col overflow-hidden">
         <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-          {historyLoading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-16 w-3/4" />
-              <Skeleton className="h-16 w-3/4 ml-auto" />
-              <Skeleton className="h-16 w-3/4" />
-            </div>
-          ) : (!history || history.length === 0) ? (
+          {history.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center gap-4 py-12">
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
                 <Bot className="w-8 h-8 text-primary" />
@@ -142,8 +179,17 @@ export function Chat() {
         </CardContent>
 
         <div className="border-t p-4">
-          {history && history.length > 0 && (
+          {history.length > 0 && (
             <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+              <button
+                onClick={clearHistory}
+                disabled={sendMessage.isPending}
+                className="text-xs border rounded-full px-3 py-1 whitespace-nowrap hover:bg-destructive hover:text-destructive-foreground transition-colors text-muted-foreground shrink-0 flex items-center gap-1"
+                data-testid="button-clear-chat"
+              >
+                <Trash2 className="w-3 h-3" />
+                Limpiar chat
+              </button>
               {SUGGESTIONS.slice(0, 2).map(s => (
                 <button
                   key={s}
